@@ -13,6 +13,14 @@ struct TokenPreview: View {
                         .foregroundStyle(Tokens.ink)
 
                     GlassCard {
+                        HStack(spacing: 24) {
+                            OrbView(size: 90)
+                            ConfidenceRing(value: 78)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    GlassCard {
                         VStack(alignment: .leading, spacing: 10) {
                             row("ink", Tokens.ink)
                             row("inkSoft", Tokens.inkSoft)
