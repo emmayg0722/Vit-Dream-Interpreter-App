@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// The six interpretive lenses (PDD 7.3).
-enum Lens: String, Codable, CaseIterable {
+enum Lens: String, Codable, CaseIterable, Hashable {
     case zhougong
     case freud
     case jung
