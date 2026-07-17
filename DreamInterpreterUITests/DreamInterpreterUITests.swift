@@ -20,4 +20,19 @@ final class DreamInterpreterUITests: XCTestCase {
         app.tabBars.buttons["Insights"].tap()
         app.tabBars.buttons["Tonight"].tap()
     }
+
+    /// TASK-004: the sample dream fills the draft and enables the CTA
+    /// (FR-001, FR-011, PDD 2.4 — interpret disabled below the minimum length).
+    @MainActor
+    func testSampleDreamEnablesInterpretButton() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let interpretButton = app.buttons["Interpret this dream"]
+        XCTAssertTrue(interpretButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(interpretButton.isEnabled)
+
+        app.buttons["Try the sample dream, a giant mosquito at a park in Japan"].tap()
+        XCTAssertTrue(interpretButton.isEnabled)
+    }
 }
