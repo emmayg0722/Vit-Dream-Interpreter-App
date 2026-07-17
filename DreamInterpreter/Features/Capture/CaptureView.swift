@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// Tonight tab — dream capture screen (prototype `InputScreen`, PDD 2.3 step 1-2).
-/// Interpretation is not wired yet: the CTA enables/disables correctly but the
-/// request itself is M2 (FR-003, Q-001); AnalyzingView/ReadingView land later.
+/// Interpretation is only wired for the sample dream (FR-011, fully offline);
+/// arbitrary dream text is M2 (FR-003, Q-001) — the CTA still enables/disables
+/// correctly, it just has nowhere to send a real dream yet.
 struct CaptureView: View {
     @State private var viewModel = CaptureViewModel()
+    @State private var showingSampleReading = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isTextFieldFocused: Bool
 
@@ -29,6 +31,9 @@ struct CaptureView: View {
                 .padding(.bottom, 140)
             }
             .scrollDismissesKeyboard(.interactively)
+        }
+        .fullScreenCover(isPresented: $showingSampleReading) {
+            ReadingView(dreamText: SampleDream.text, reading: SampleDream.reading)
         }
     }
 
@@ -153,7 +158,11 @@ struct CaptureView: View {
     private var interpretButton: some View {
         VStack(spacing: 8) {
             Button {
-                // Interpretation request is M2 (FR-003, Q-001) — not wired yet.
+                if viewModel.canShowSampleReading {
+                    showingSampleReading = true
+                }
+                // Arbitrary dream text has nowhere to go yet — InterpretationService
+                // is M2 (FR-003, Q-001).
             } label: {
                 Text("Interpret this dream")
                     .font(.system(size: 15.5, weight: .semibold))

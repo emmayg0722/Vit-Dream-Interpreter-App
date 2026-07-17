@@ -31,6 +31,12 @@ final class CaptureViewModel {
         text.count > Self.softLimit
     }
 
+    /// FR-011: the sample dream produces its canned reading fully offline,
+    /// regardless of whether `InterpretationService` (M2, Q-001) exists yet.
+    var canShowSampleReading: Bool {
+        text == SampleDream.text
+    }
+
     func loadSampleDream() {
         text = SampleDream.text
     }

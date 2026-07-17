@@ -52,6 +52,14 @@ enum Tokens {
     static let lensCulture = Color(hex: 0xA8C7F5)
     static let lensSpirit = Color(hex: 0xF5DFA8)
 
+    /// Tone-chip palette (prototype `RESULT.tones`), cycled by index since
+    /// the wire contract carries only labels (PDD 7.3 `Reading.tones: [String]`).
+    static let toneColors: [Color] = [lavender, rose, teal, peach]
+
+    static func toneColor(at index: Int) -> Color {
+        toneColors[index % toneColors.count]
+    }
+
     static func color(for lens: Lens) -> Color {
         switch lens {
         case .zhougong: lensZhougong
