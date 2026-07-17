@@ -276,7 +276,8 @@ A feature is done only when:
 
 ### 5.2 Partially working
 
-- TASK-001 implemented, **build not yet verified on macOS**: Xcode 16 project (objectVersion 77, filesystem-synchronized groups) with app + unit test + UI test targets, shared scheme, SwiftData container over `Dream`/`Reading`/`LensReading`, and the three-tab shell (system `TabView` with placeholder screens — glass capsule tab bar is TASK-002). Authored in a Linux agent session without Xcode; the first person/agent on macOS must run the PDD 8.2 build + test commands and record the result in 5.4.
+- TASK-001 implemented, **build not yet verified on macOS**: Xcode 16 project (objectVersion 77, filesystem-synchronized groups) with app + unit test + UI test targets, shared scheme, SwiftData container over `Dream`/`Reading`/`LensReading`, and the three-tab shell (system `TabView` with placeholder screens). Authored in a Linux agent session without Xcode; the first person/agent on macOS must run the PDD 8.2 build + test commands and record the result in 5.4.
+- TASK-002 implemented, same verification caveat: `Tokens.swift` (colors, glass recipe, CTA gradient, motion durations), `AuroraBackground` (gradient + three drifting glows + stars, stills under Reduce Motion), `GlassCard` view + `.glassCard()` modifier, and `TokenPreview` (dev-only screen for the prototype color comparison). Feature screens do not use them yet — wiring happens in TASK-004/006.
 
 ### 5.3 Not implemented
 
@@ -305,7 +306,7 @@ A feature is done only when:
 | ID | Task | Owner | Relevant files | Dependencies | Status | Validation |
 |---|---|---|---|---|---|---|
 | TASK-001 | Create Xcode project, targets, SwiftData container, tab shell | Agent | `App/*` | — | Implemented — simulator verification pending (authored off-macOS) | Builds + launches in simulator |
-| TASK-002 | Port design tokens + `AuroraBackground` + `GlassCard` | Agent | `Core/DesignSystem/*` | TASK-001 | Planned | Token preview screen matches prototype colors |
+| TASK-002 | Port design tokens + `AuroraBackground` + `GlassCard` | Agent | `Core/DesignSystem/*` | TASK-001 | Implemented — preview comparison pending (authored off-macOS) | Token preview screen matches prototype colors |
 | TASK-003 | `OrbView` (breathe animation, Reduce Motion aware) + `ConfidenceRing` | Agent | `Core/DesignSystem/*` | TASK-002 | Planned | Previews; motion stops with Reduce Motion |
 | TASK-004 | Capture screen UI with draft persistence | Agent | `Features/Capture/*` | TASK-002 | Planned | Draft survives relaunch (unit + manual) |
 | TASK-005 | `ReadingDTO` + sample mosquito fixture + decoding tests | Agent | `Core/Models/`, `Core/Fixtures/` | — | Planned | Unit tests green |
