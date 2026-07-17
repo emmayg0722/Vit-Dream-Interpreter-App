@@ -1,0 +1,24 @@
+# Xcode
+DerivedData/
+build/
+*.xcresult
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Secrets — never commit keys (PDD 10.2)
+*.pem
+*.p12
+*.mobileprovision
+.env
+
+# Claude Code local settings
+.claude/settings.local.json
