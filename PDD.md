@@ -235,7 +235,7 @@ A feature is done only when:
 | Capture (Tonight) | `Features/Capture/CaptureView.swift`, `CaptureViewModel.swift` | `Core/Services/SpeechService.swift` | Unit + UI | Draft persistence via SwiftData |
 | Analyzing state | `Features/Capture/AnalyzingView.swift` | — | UI | Driven by request lifecycle |
 | Reading screen | `Features/Reading/ReadingView.swift`, `ReadingViewModel.swift` | `LensCard.swift`, `ContributionBar.swift`, `SectionViews.swift` | Unit + UI | Renders `ReadingDTO` |
-| Interpretation service | `Core/Services/InterpretationService.swift` | `Core/Networking/APIClient.swift`, `Core/Models/ReadingDTO.swift` | Unit (fixtures) | JSON schema owner = `ReadingDTO.swift` |
+| Interpretation service | `Core/Services/InterpretationService.swift` | `Core/Networking/APIClient.swift`, `Core/Models/ReadingDTO.swift`, `Core/Services/APIKeyStore.swift`, `Features/Capture/APIKeySheet.swift` | Unit (fixtures) | JSON schema owner = `ReadingDTO.swift`; key in Keychain only (ADR-006) |
 | Journal | `Features/Journal/JournalView.swift`, `JournalCard.swift` | `Core/Models/*` (SwiftData) | Unit + UI | Delete with confirm |
 | Insights | `Features/Insights/InsightsView.swift`, `InsightsViewModel.swift` | `Charts` (Swift Charts) | Unit (aggregation) | All stats computed, none hardcoded |
 | Onboarding | `Features/Onboarding/OnboardingView.swift` | — | UI | Replaces web landing page |
@@ -247,6 +247,7 @@ A feature is done only when:
 |---|---|---|
 | `DreamInterpreterApp` | `App/DreamInterpreterApp.swift` | App entry, SwiftData container, onboarding gate |
 | `InterpretationService` | `Core/Services/InterpretationService.swift` | Build prompt → call API → decode/retry → `ReadingDTO` |
+| `APIKeyStoring` / `KeychainAPIKeyStore` | `Core/Services/APIKeyStore.swift` | User-supplied Anthropic key, Keychain-only (Q-001 interim / ADR-006) |
 | `ReadingDTO` | `Core/Models/ReadingDTO.swift` | The AI JSON contract (single source of schema truth) |
 | `Dream`, `Reading`, `LensReading` | `Core/Models/` | SwiftData persistence models |
 | `SpeechService` | `Core/Services/SpeechService.swift` | Permission, live transcription, teardown |
@@ -282,6 +283,7 @@ A feature is done only when:
 - TASK-005 implemented, test run pending on macOS: `ReadingDTO`/`LensReadingDTO` (Core/Models/ReadingDTO.swift) with `decode(from:)` validating required fields, confidence/balanceScore ranges, and exactly-six-unique-lenses, then normalizing lens weights to sum to 100 by largest-remainder rounding (PDD 7.5). `SampleDream` (Core/Fixtures/SampleDream.swift) carries the full mosquito reading verbatim from the prototype for FR-011's offline demo path. `DreamInterpreterTests/ReadingDTOTests.swift` covers round-trip, weight normalization, and each validation failure mode. Also fixed a latent bug: `Lens` (Core/Models/LensReading.swift) was missing `Hashable`, needed for `Set<Lens>` validation and already silently required by TASK-003's `ForEach(Lens.allCases, id: \.self)`.
 - TASK-004 implemented, manual relaunch pass pending on macOS: `CaptureView` renders the full prototype `InputScreen` (orb + greeting, glass dream-text card with char counter and soft over-2000 warning, mic button, sample-dream suggestion, gradient CTA that enables at 10+ trimmed characters with a gentle hint below when text is present but short). `CaptureViewModel` persists the draft to `UserDefaults` on every change (FR-001; survives relaunch by construction, not just observation) and drives a placeholder voice interaction that mirrors the prototype's own timed demo fill — real dictation is `SpeechService`/FR-002 in M2, not built yet. Tests: `CaptureViewModelTests` (persistence, minimum length, sample fill, soft limit) and a UI test exercising the sample-dream → enabled-CTA path.
 - TASK-006 implemented, UI test run pending on macOS: `ReadingView` renders a `ReadingDTO` in full per prototype `ResultScreen` — the dream quote, summary + `ConfidenceRing` + tone chips, six `LensCard`s (one expanded at a time via `ReadingViewModel`, default Jung to match the prototype), `ContributionBar` (segments sum to 100% because `ReadingDTO.decode` already normalized them), the gradient-bordered synthesis card, and the four closing sections (main message, concerns, opportunities/warnings, questions, actions). Added `Core/DesignSystem/ToneChip.swift` (listed in the Repository Map since TASK-002 but not actually built until now) and `Tokens.toneColor(at:)`, since tones are wire-level `[String]` labels with colors assigned by cycling a fixed palette, not carried in the DTO. "Save to dream journal" only flips a local flag for now — real persistence is FR-008/M3. **The "Interpret this dream" CTA is now wired for the sample dream only** (FR-011: canned reading, fully offline) — `CaptureViewModel.canShowSampleReading` checks the draft equals `SampleDream.text` and presents `ReadingView` via `fullScreenCover`; arbitrary dream text still goes nowhere (M2/Q-001). Tests: `ReadingViewModelTests` (default-expanded lens, single-open toggle, save flag) and a UI test walking sample dream → interpret → asserting every section label and the save button render, then back.
+- TASK-007 implemented, build + test run pending on macOS: **live interpretation for arbitrary dream text (FR-003, pulled forward from M2 under the Q-001 interim decision / ADR-006)**. `InterpretationService` (Core/Services/) builds the system prompt (mirrored in `docs/interpretation-prompt.md`), calls the Anthropic Messages API (`claude-sonnet-5`) through the `APIClient` seam (Core/Networking/), validates every reply via `ReadingDTO.decode`, and retries once with the validation error fed back before surfacing a typed `InterpretationError` with calm user copy. `KeychainAPIKeyStore` holds the user-supplied API key in the device Keychain only; `APIKeySheet` collects/updates/removes it and resumes the pending interpretation after a save. `CaptureViewModel` now owns the Capture → Analyzing → Reading flow: sample text keeps the offline canned path (FR-011, no key needed), other text shows `AnalyzingView` (prototype `AnalyzingScreen`: orb + four staged messages + progress dots, stills under Reduce Motion) and presents the decoded reading full-screen; any failure preserves the draft and shows a glass error card under the CTA (with an "Update API key" recovery when the key was the problem). Dream text and the key never touch logs (NFR-005). Tests: `InterpretationServiceTests` (mock transport: success, fenced-JSON tolerance, retry-with-feedback, double-failure, status-code mapping, offline, missing key) and expanded `CaptureViewModelTests` (sample offline path, key-sheet gating, success/failure flows, resume-after-key-save).
 
 ### 5.3 Not implemented
 
@@ -317,6 +319,7 @@ All six M1 tasks (6.2) are authored. What's outstanding before M1 can be called 
 | TASK-004 | Capture screen UI with draft persistence | Agent | `Features/Capture/*` | TASK-002 | Implemented — manual relaunch pass pending (authored off-macOS) | Draft survives relaunch (unit + manual) |
 | TASK-005 | `ReadingDTO` + sample mosquito fixture + decoding tests | Agent | `Core/Models/`, `Core/Fixtures/` | — | Implemented — test run pending (authored off-macOS) | Unit tests green |
 | TASK-006 | Reading screen rendering the fixture | Agent | `Features/Reading/*` | TASK-003, TASK-005 | Implemented — UI test run pending (authored off-macOS) | All sections render; UI test |
+| TASK-007 | Live interpretation for arbitrary dreams (FR-003, Q-001 interim / ADR-006): `InterpretationService` + `APIClient` + Keychain key store + `AnalyzingView` + key sheet + error states | Agent | `Core/Services/*`, `Core/Networking/*`, `Features/Capture/*`, `docs/interpretation-prompt.md` | TASK-004, TASK-005, TASK-006 | Implemented — build/test run pending (authored off-macOS) | Unit tests green; manual: own dream → analyzing → reading; failure keeps draft |
 
 ### 6.3 Execution order
 
@@ -328,7 +331,7 @@ All six M1 tasks (6.2) are authored. What's outstanding before M1 can be called 
 
 | ID | Question / blocker | Owner | Decision needed by | Status |
 |---|---|---|---|---|
-| Q-001 | AI access strategy: direct Anthropic API with key in a lightweight proxy backend (recommended) vs. user-supplied key vs. embedded key (rejected — insecure). Proxy stack TBD. | [You] | Before M2 | Open |
+| Q-001 | AI access strategy: direct Anthropic API with key in a lightweight proxy backend (recommended) vs. user-supplied key vs. embedded key (rejected — insecure). Proxy stack TBD. | [You] | Before M2 | Interim decision (ADR-006): user-supplied key in Keychain for dev builds; proxy still required before TestFlight/App Store — proxy stack remains open |
 | Q-002 | Analytics: none vs. privacy-preserving local-only vs. TelemetryDeck-style. Affects success criteria measurement. | [You] | Before M5 | Open |
 | Q-003 | App Store positioning: entertainment/lifestyle framing and disclaimer copy to satisfy review guidelines for interpretation content. | [You] | Before M5 | Open |
 
@@ -516,7 +519,7 @@ xcodebuild -scheme DreamInterpreter -destination 'platform=iOS Simulator,name=iP
 | Threat | Impact | Mitigation | Status |
 |---|---|---|---|
 | API key extraction from binary | Cost abuse | Proxy architecture (Q-001) | Open |
-| Prompt injection via dream text altering reading tone/safety | Misleading output | System prompt hardening + DTO validation + content constraints in `docs/interpretation-prompt.md` | Planned |
+| Prompt injection via dream text altering reading tone/safety | Misleading output | System prompt hardening + DTO validation + content constraints in `docs/interpretation-prompt.md` | Implemented (TASK-007): dream text framed as content-not-instructions; nothing renders without `ReadingDTO.decode` |
 | Sensitive dream data in logs/crash reports | Privacy breach | NFR-005 audit + no third-party loggers | Planned |
 
 ---
@@ -530,6 +533,7 @@ xcodebuild -scheme DreamInterpreter -destination 'platform=iOS Simulator,name=iP
 | ADR-003 | 2026-07-17 | `design/prototype.jsx` is the canonical design reference; Section 9 owns the SwiftUI translation | Prototype's style is approved and liked; avoids redesign drift | Figma redraw (extra work, drift risk) | Agents must read the relevant prototype section for UI tasks |
 | ADR-004 | 2026-07-17 | `ReadingDTO.swift` is the single source of schema truth; the prompt doc must match it | Prevents schema drift between prompt and decoder | Schema in prompt doc only | Schema changes require paired updates + fixtures |
 | ADR-005 | 2026-07-17 | On-device data only in v1; no accounts | Privacy principle, faster v1 | Cloud-first with auth | Sync deferred to v2 (CloudKit candidate) |
+| ADR-006 | 2026-07-19 | Q-001 interim: dev builds call the Anthropic API directly with a user-supplied key stored in the device Keychain (`KeychainAPIKeyStore`); no key in repo, binary, or UserDefaults | Unblocks FR-003 so real dreams get readings during development | Embedded key (insecure); waiting for the proxy (blocks all testing of the core loop) | Proxy backend still required before TestFlight/App Store (10.4 threat stays open); `InterpretationService` swaps transport, not schema |
 
 ---
 

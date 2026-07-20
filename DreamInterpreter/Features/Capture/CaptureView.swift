@@ -1,39 +1,53 @@
 import SwiftUI
 
 /// Tonight tab — dream capture screen (prototype `InputScreen`, PDD 2.3 step 1-2).
-/// Interpretation is only wired for the sample dream (FR-011, fully offline);
-/// arbitrary dream text is M2 (FR-003, Q-001) — the CTA still enables/disables
-/// correctly, it just has nowhere to send a real dream yet.
+/// The sample dream shows its canned reading fully offline (FR-011); any other
+/// text goes Capture → Analyzing → Reading through `InterpretationService`
+/// (FR-003), with the draft preserved on any failure (PDD 2.4).
 struct CaptureView: View {
     @State private var viewModel = CaptureViewModel()
-    @State private var showingSampleReading = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         ZStack {
             AuroraBackground()
-            ScrollView {
-                VStack(spacing: 18) {
-                    header
-                    dreamCard
-                    if viewModel.text.isEmpty {
-                        sampleDreamButton
+            if viewModel.isAnalyzing {
+                AnalyzingView()
+                    .transition(.opacity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 18) {
+                        header
+                        dreamCard
+                        if viewModel.text.isEmpty {
+                            sampleDreamButton
+                        }
+                        interpretButton
+                        Text("Reflections, not predictions · For self-exploration only")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Tokens.inkFaint)
+                            .multilineTextAlignment(.center)
                     }
-                    interpretButton
-                    Text("Reflections, not predictions · For self-exploration only")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Tokens.inkFaint)
-                        .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 36)
+                    .padding(.bottom, 140)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 36)
-                .padding(.bottom, 140)
+                .scrollDismissesKeyboard(.interactively)
+                .transition(.opacity)
             }
-            .scrollDismissesKeyboard(.interactively)
         }
-        .fullScreenCover(isPresented: $showingSampleReading) {
-            ReadingView(dreamText: SampleDream.text, reading: SampleDream.reading)
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: Tokens.Motion.transition),
+            value: viewModel.isAnalyzing
+        )
+        .fullScreenCover(item: $viewModel.presentedReading) { presented in
+            ReadingView(dreamText: presented.dreamText, reading: presented.reading)
+        }
+        .sheet(isPresented: $viewModel.showingKeySheet) {
+            APIKeySheet(keyStore: viewModel.keyStore) {
+                viewModel.apiKeySaved()
+            }
         }
     }
 
@@ -158,11 +172,8 @@ struct CaptureView: View {
     private var interpretButton: some View {
         VStack(spacing: 8) {
             Button {
-                if viewModel.canShowSampleReading {
-                    showingSampleReading = true
-                }
-                // Arbitrary dream text has nowhere to go yet — InterpretationService
-                // is M2 (FR-003, Q-001).
+                isTextFieldFocused = false
+                viewModel.interpretTapped()
             } label: {
                 Text("Interpret this dream")
                     .font(.system(size: 15.5, weight: .semibold))
@@ -189,7 +200,36 @@ struct CaptureView: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(Tokens.inkFaint)
             }
+
+            if let errorMessage = viewModel.errorMessage {
+                errorCard(message: errorMessage)
+            }
         }
+    }
+
+    /// Calm failure state (PDD 2.4): the draft stays untouched, the CTA above
+    /// remains the retry, and key problems offer the key sheet directly.
+    private func errorCard(message: String) -> some View {
+        VStack(spacing: 10) {
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(Tokens.inkSoft)
+                .multilineTextAlignment(.center)
+            if viewModel.errorIsKeyProblem {
+                Button {
+                    viewModel.showingKeySheet = true
+                } label: {
+                    Text("Update API key")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Tokens.lavender)
+                        .frame(minHeight: 44)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .glassCard(cornerRadius: 18)
+        .transition(.opacity)
     }
 }
 
